@@ -4,7 +4,7 @@ name = "asthma-risk-system"
 version = "1.0.0"
 
 # 2. Add the Python version constraint
-requires-python = "==3.10.*"
+requires-python = "==3.9.*"
 
 # 3. Use the dependencies from requirements.txt
 # We leave this blank and let Vercel use requirements.txt (Detected both pyproject.toml and requirements.txt)
