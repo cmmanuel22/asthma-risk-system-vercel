@@ -5,30 +5,20 @@ import numpy as np
 from dataclasses import dataclass, asdict
 from typing import Dict
 
-# --- TFLite Runtime Compatibility (Corrected) ---
-# CRITICAL FIX: The interpreter is often available directly under the tflite_runtime module.
+# Use a try-except block to handle different TFLite runtime installations
 try:
     from tflite_runtime.interpreter import Interpreter
-    print("Using tflite_runtime.interpreter.Interpreter")
 except ImportError:
-    try:
-        from tflite_runtime import Interpreter
-        print("Using tflite_runtime.Interpreter (Top Level)")
-    except ImportError:
-        import tensorflow as tf
-        Interpreter = tf.lite.Interpreter
-        print("Using tensorflow.lite.Interpreter (Full TF fallback)")
+    import tensorflow as tf
+    Interpreter = tf.lite.Interpreter
 
-
-# ------------------ ⚠️ MODEL PATH FIX ⚠️ ------------------
-# The new path goes UP one directory (..) from 'api' to the project root,
-# then DOWN into the 'model' directory.
+# --- ⚠️ CORRECTED MODEL PATH ⚠️ ---
+# This path correctly finds the model file placed directly inside the 'api' folder.
 MODEL_FILENAME = "audio_model_standard.tflite"
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODEL_PATH = os.path.join(BASE_DIR, 'model', MODEL_FILENAME)
-# ------------------------------------------------------------
+MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), MODEL_FILENAME)
+# ------------------------------------
 
-
+# --- Configuration ---
 SAMPLE_RATE = 16000
 N_MELS = 40
 N_FFT = 2048
@@ -39,7 +29,10 @@ AUDIO_CATEGORIES = {0: "SAFE", 1: "MEDIUM", 2: "HIGH"}
 # --- Initialize Flask App and Load Model ---
 app = Flask(__name__)
 
-# Load the model only once when the function starts
+interpreter = None
+input_details = None
+output_details = None
+
 try:
     interpreter = Interpreter(model_path=MODEL_PATH)
     interpreter.allocate_tensors()
@@ -47,11 +40,9 @@ try:
     output_details = interpreter.get_output_details()
     print("✅ TFLite model loaded successfully.")
 except Exception as e:
-    # This exception now handles both file-not-found AND library-not-found issues
-    print(f"❌ FATAL ERROR: Could not load TFLite model or initialize Interpreter: {e}")
-    interpreter = None
+    print(f"❌ FATAL ERROR: Could not load TFLite model. Check path and file integrity: {e}")
 
-# --- Risk Fusion Logic (Rest of the Code is Unchanged) ---
+# --- Risk Fusion Logic ---
 SENSOR_WEIGHTS: Dict[str, float] = {"audio": 1.0, "spo2": 2.5, "breathing": 1.5}
 TOTAL_WEIGHT: float = sum(SENSOR_WEIGHTS.values())
 RISK_THRESHOLDS: Dict[str, float] = {"safe_max": 0.67, "medium_max": 1.33, "high_min": 1.33}
@@ -94,17 +85,19 @@ def hybrid_fusion(audio_risk: int, spo2_value: float, bpm: float) -> FusionOutpu
     reasoning = f"Weighted fusion score of {risk_score:.2f} resulted in a {final_risk} risk assessment."
     return FusionOutput(final_risk, risk_score, confidence, reasoning, individual_risks, False)
 
-# --- API-Specific Functions (Unchanged logic) ---
+# --- API-Specific Functions ---
 def create_mel_spectrogram(file_stream) -> np.ndarray:
     try:
         signal, sr = librosa.load(file_stream, sr=SAMPLE_RATE)
         max_len_samples = sr * MAX_CLIP_SECONDS
         if len(signal) > max_len_samples: signal = signal[:max_len_samples]
         elif len(signal) < max_len_samples: signal = np.pad(signal, (0, max_len_samples - len(signal)), mode='constant')
+        
         mel_spec = librosa.feature.melspectrogram(y=signal, sr=sr, n_fft=N_FFT, hop_length=HOP_LENGTH, n_mels=N_MELS)
         mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max)
         min_val, max_val = mel_spec_db.min(), mel_spec_db.max()
         if max_val == min_val: return np.zeros_like(mel_spec_db)[..., np.newaxis]
+        
         norm_spec = (mel_spec_db - min_val) / (max_val - min_val)
         return norm_spec[..., np.newaxis]
     except Exception as e:
@@ -114,10 +107,10 @@ def create_mel_spectrogram(file_stream) -> np.ndarray:
 @app.route("/api/predict", methods=["POST"])
 def predict():
     if interpreter is None:
-        return jsonify({"error": "Model is not loaded on the server. Check build logs for dependency errors."}), 500
+        return jsonify({"error": "Model is not loaded on the server. Check build logs."}), 500
 
     if 'audio_file' not in request.files or 'spo2' not in request.form or 'bpm' not in request.form:
-        return jsonify({"error": "Missing required form data: audio_file, spo2, and bpm."}), 400
+        return jsonify({"error": "Missing form data: audio_file, spo2, and bpm are required."}), 400
 
     audio_file = request.files['audio_file']
     
@@ -129,7 +122,7 @@ def predict():
 
     feature = create_mel_spectrogram(audio_file.stream)
     if feature is None:
-        return jsonify({"error": "Failed to extract audio features."}), 500
+        return jsonify({"error": "Failed to extract audio features from the provided file."}), 500
         
     input_data = np.expand_dims(feature, axis=0).astype(np.float32)
     interpreter.set_tensor(input_details[0]['index'], input_data)
