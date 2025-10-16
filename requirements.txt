@@ -1,6 +1,6 @@
 Flask
 gunicorn
 numpy
-tflite-runtime
+tflite-runtime  // This should now find a match for Python 3.11
 librosa
 werkzeug
