@@ -1,0 +1,4 @@
+[project]
+name = "asthma-risk-system"
+# This forces Vercel to use Python 3.10
+requires-python = "==3.10.*"
