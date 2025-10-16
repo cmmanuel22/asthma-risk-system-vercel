@@ -7,20 +7,12 @@
         "runtime": "python3.10",
         "maxLambdaSize": "100mb"
       }
-    },
-    {
-      "src": "public/**/*",
-      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "api/index.py"
-    },
-    {
       "src": "/(.*)",
-      "dest": "public/$1"
+      "dest": "api/index.py"
     }
   ]
 }
