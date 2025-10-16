@@ -6,30 +6,28 @@ from dataclasses import dataclass, asdict
 from typing import Dict
 
 # --- TFLite Runtime Compatibility (Corrected) ---
-# CRITICAL FIX: The interpreter is often available directly under the tflite_runtime module,
-# not necessarily inside an 'interpreter' submodule like in full TensorFlow.
+# CRITICAL FIX: The interpreter is often available directly under the tflite_runtime module.
 try:
-    # Attempt to import Interpreter directly from tflite_runtime (common pattern)
     from tflite_runtime.interpreter import Interpreter
     print("Using tflite_runtime.interpreter.Interpreter")
 except ImportError:
     try:
-        # Some build environments place it right at the top level
         from tflite_runtime import Interpreter
         print("Using tflite_runtime.Interpreter (Top Level)")
     except ImportError:
-        # Fallback to full TensorFlow for local testing/development
         import tensorflow as tf
         Interpreter = tf.lite.Interpreter
         print("Using tensorflow.lite.Interpreter (Full TF fallback)")
 
 
-# --- Configuration ---
-# Vercel's Serverless Function should be able to find a small file 
-# placed in the same directory as the function file (api/index.py).
-# Assuming 'audio_model_standard.tflite' is in the 'api' directory.
+# ------------------ ⚠️ MODEL PATH FIX ⚠️ ------------------
+# The new path goes UP one directory (..) from 'api' to the project root,
+# then DOWN into the 'model' directory.
 MODEL_FILENAME = "audio_model_standard.tflite"
-MODEL_PATH = os.path.join(os.path.dirname(__file__), MODEL_FILENAME)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODEL_PATH = os.path.join(BASE_DIR, 'model', MODEL_FILENAME)
+# ------------------------------------------------------------
+
 
 SAMPLE_RATE = 16000
 N_MELS = 40
@@ -53,7 +51,7 @@ except Exception as e:
     print(f"❌ FATAL ERROR: Could not load TFLite model or initialize Interpreter: {e}")
     interpreter = None
 
-# --- Risk Fusion Logic (Remaining Code - Unchanged) ---
+# --- Risk Fusion Logic (Rest of the Code is Unchanged) ---
 SENSOR_WEIGHTS: Dict[str, float] = {"audio": 1.0, "spo2": 2.5, "breathing": 1.5}
 TOTAL_WEIGHT: float = sum(SENSOR_WEIGHTS.values())
 RISK_THRESHOLDS: Dict[str, float] = {"safe_max": 0.67, "medium_max": 1.33, "high_min": 1.33}

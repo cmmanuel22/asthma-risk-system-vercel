@@ -1,4 +1,10 @@
 {
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python"
+    }
+  ],
   "routes": [
     {
       "src": "/api/(.*)",
@@ -8,5 +14,6 @@
       "src": "/(.*)",
       "dest": "public/$1"
     }
-  ]
+  ],
+  "installCommand": "pip install flask gunicorn numpy tflite-runtime && pip install librosa werkzeug"
 }
