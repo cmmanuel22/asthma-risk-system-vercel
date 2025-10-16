@@ -2,13 +2,32 @@ import os
 from flask import Flask, request, jsonify
 import librosa
 import numpy as np
-import tensorflow as tf
 from dataclasses import dataclass, asdict
 from typing import Dict
-import werkzeug.utils
+
+# --- TFLite Runtime Compatibility (Corrected) ---
+# CRITICAL FIX: The interpreter is often available directly under the tflite_runtime module,
+# not necessarily inside an 'interpreter' submodule like in full TensorFlow.
+try:
+    # Attempt to import Interpreter directly from tflite_runtime (common pattern)
+    from tflite_runtime.interpreter import Interpreter
+    print("Using tflite_runtime.interpreter.Interpreter")
+except ImportError:
+    try:
+        # Some build environments place it right at the top level
+        from tflite_runtime import Interpreter
+        print("Using tflite_runtime.Interpreter (Top Level)")
+    except ImportError:
+        # Fallback to full TensorFlow for local testing/development
+        import tensorflow as tf
+        Interpreter = tf.lite.Interpreter
+        print("Using tensorflow.lite.Interpreter (Full TF fallback)")
+
 
 # --- Configuration ---
-# Vercel's ephemeral filesystem requires us to load the model from the same directory
+# Vercel's Serverless Function should be able to find a small file 
+# placed in the same directory as the function file (api/index.py).
+# Assuming 'audio_model_standard.tflite' is in the 'api' directory.
 MODEL_FILENAME = "audio_model_standard.tflite"
 MODEL_PATH = os.path.join(os.path.dirname(__file__), MODEL_FILENAME)
 
@@ -22,17 +41,19 @@ AUDIO_CATEGORIES = {0: "SAFE", 1: "MEDIUM", 2: "HIGH"}
 # --- Initialize Flask App and Load Model ---
 app = Flask(__name__)
 
+# Load the model only once when the function starts
 try:
-    interpreter = tf.lite.Interpreter(model_path=MODEL_PATH)
+    interpreter = Interpreter(model_path=MODEL_PATH)
     interpreter.allocate_tensors()
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
     print("✅ TFLite model loaded successfully.")
 except Exception as e:
-    print(f"❌ FATAL ERROR: Could not load TFLite model: {e}")
+    # This exception now handles both file-not-found AND library-not-found issues
+    print(f"❌ FATAL ERROR: Could not load TFLite model or initialize Interpreter: {e}")
     interpreter = None
 
-# --- Risk Fusion Logic ---
+# --- Risk Fusion Logic (Remaining Code - Unchanged) ---
 SENSOR_WEIGHTS: Dict[str, float] = {"audio": 1.0, "spo2": 2.5, "breathing": 1.5}
 TOTAL_WEIGHT: float = sum(SENSOR_WEIGHTS.values())
 RISK_THRESHOLDS: Dict[str, float] = {"safe_max": 0.67, "medium_max": 1.33, "high_min": 1.33}
@@ -75,7 +96,7 @@ def hybrid_fusion(audio_risk: int, spo2_value: float, bpm: float) -> FusionOutpu
     reasoning = f"Weighted fusion score of {risk_score:.2f} resulted in a {final_risk} risk assessment."
     return FusionOutput(final_risk, risk_score, confidence, reasoning, individual_risks, False)
 
-# --- API-Specific Functions ---
+# --- API-Specific Functions (Unchanged logic) ---
 def create_mel_spectrogram(file_stream) -> np.ndarray:
     try:
         signal, sr = librosa.load(file_stream, sr=SAMPLE_RATE)
@@ -95,7 +116,7 @@ def create_mel_spectrogram(file_stream) -> np.ndarray:
 @app.route("/api/predict", methods=["POST"])
 def predict():
     if interpreter is None:
-        return jsonify({"error": "Model is not loaded on the server"}), 500
+        return jsonify({"error": "Model is not loaded on the server. Check build logs for dependency errors."}), 500
 
     if 'audio_file' not in request.files or 'spo2' not in request.form or 'bpm' not in request.form:
         return jsonify({"error": "Missing required form data: audio_file, spo2, and bpm."}), 400

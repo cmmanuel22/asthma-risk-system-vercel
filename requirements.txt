@@ -1,6 +1,6 @@
 Flask
 gunicorn
 numpy
-tensorflow
+tflite-runtime
 librosa
 werkzeug
