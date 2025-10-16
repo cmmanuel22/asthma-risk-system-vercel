@@ -1,0 +1,6 @@
+Flask
+gunicorn
+numpy
+tflite-runtime
+librosa
+werkzeug

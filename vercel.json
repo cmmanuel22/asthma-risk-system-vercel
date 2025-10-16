@@ -2,7 +2,15 @@
   "builds": [
     {
       "src": "api/index.py",
-      "use": "@vercel/python"
+      "use": "@vercel/python",
+      "config": {
+        "runtime": "python3.10",
+        "maxLambdaSize": "100mb"
+      }
+    },
+    {
+      "src": "public/**/*",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
@@ -14,6 +22,5 @@
       "src": "/(.*)",
       "dest": "public/$1"
     }
-  ],
-  "installCommand": "pip install flask gunicorn numpy tflite-runtime && pip install librosa werkzeug"
+  ]
 }
