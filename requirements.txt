@@ -1,6 +1,5 @@
-Flask==3.1.2
-numpy==1.26.4
-# tflite-runtime pinned for Python 3.10
-tflite-runtime==2.13.0
-librosa==0.10.1
-werkzeug==3.1.3
+flask
+numpy
+librosa
+soundfile
+tflite-runtime==2.14.0
