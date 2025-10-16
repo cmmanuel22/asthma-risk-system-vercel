@@ -4,15 +4,18 @@
       "src": "api/index.py",
       "use": "@vercel/python",
       "config": {
-        "runtime": "python3.10",
-        "maxLambdaSize": "100mb"
+        "runtime": "python3.10"
       }
     }
   ],
   "routes": [
     {
-      "src": "/(.*)",
+      "src": "/api/(.*)",
       "dest": "api/index.py"
+    },
+    {
+      "src": "/index.html",
+      "dest": "public/index.html"
     }
   ]
 }
