@@ -1,2 +1,0 @@
-[tool.vercel.build]
-python = "3.10"
