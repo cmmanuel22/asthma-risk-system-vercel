@@ -1,6 +1,6 @@
-Flask
-gunicorn
-numpy
-tflite-runtime
-librosa
-werkzeug
+Flask==3.1.2
+gunicorn==23.0.0
+numpy==1.26.4
+tflite-runtime==2.14.0
+librosa==0.10.1
+werkzeug==3.1.3
